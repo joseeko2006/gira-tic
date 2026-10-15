@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gira TIC INSESO</title>
+<meta name="theme-color" content="#0b6b45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Gira TIC">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+/* Layout: herramienta de campo para iPad — lista de oficinas a la izquierda, ficha de visita a la derecha; en pantalla estrecha, apiladas. */
+:root{
+  --bg:#eef2ef; --surface:#ffffff; --sunk:#f6f8f6; --ink:#16211b; --muted:#566660; --line:#d3dcd6;
+  --accent:#0b6b45; --accent-ink:#ffffff; --accent-soft:#dcefe5;
+  --ok:#2e7d3a; --warn:#a96a10; --bad:#b42318; --na:#6f7c76;
+  --ok-soft:#e1f2e3; --warn-soft:#fbefd9; --bad-soft:#fbe3e0; --na-soft:#e8ecea;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --r:10px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0e1411; --surface:#16201b; --sunk:#111915; --ink:#e5ece8; --muted:#9aaba3; --line:#2a3731;
+  --accent:#43b883; --accent-ink:#06150e; --accent-soft:#183a2a;
+  --ok:#62c672; --warn:#e3a94a; --bad:#f07563; --na:#8d9a94;
+  --ok-soft:#173222; --warn-soft:#3a2a10; --bad-soft:#3d1b17; --na-soft:#222c27;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;min-width:0;flex:1 1 220px}
+.brand b{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.brand span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.sync{display:inline-flex;align-items:center;gap:8px;font-size:14px;padding:7px 12px;border-radius:999px;background:var(--sunk);border:1px solid var(--line)}
+.sync i{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:none}
+.sync[data-s="warn"] i{background:var(--warn)}
+.btn{min-height:44px;padding:0 16px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.btn.danger.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+.banner{background:var(--warn-soft);color:var(--ink);border-bottom:1px solid var(--line);font-size:14px;
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.banner b{color:var(--warn)}
+.app{display:grid;grid-template-columns:270px minmax(0,1fr)}
+.side{border-right:1px solid var(--line);background:var(--sunk);padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:14px;display:flex;flex-direction:column;gap:14px}
+.side h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
+.offices{display:flex;flex-direction:column;gap:8px}
+.off{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:11px 12px;display:flex;flex-direction:column;gap:6px;min-height:44px}
+.off[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.off .n{font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.off .m{font-size:13px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar>b{display:block;height:100%;background:var(--accent);border-radius:3px}
+.pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--na-soft);color:var(--na);white-space:nowrap}
+.pill.encurso{background:var(--warn-soft);color:var(--warn)} .pill.completada{background:var(--ok-soft);color:var(--ok)}
+.crit{font-family:var(--mono);font-size:12px;color:var(--bad);font-weight:600}
+.box{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:14px}
+.box .row{display:flex;gap:8px}
+.box .row input{flex:1;min-width:0}
+input[type=text],input[type=tel],input[type=date],select,textarea{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:9px 11px;font-size:16px;-webkit-appearance:none;appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
+textarea{resize:vertical;line-height:1.4}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted);min-width:0}
+.main{min-width:0;padding-block:18px 60px;padding-left:20px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:10px}
+.head .title{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.head .title input{font-size:24px;font-weight:700;border:none;background:transparent;padding:2px 0;min-height:auto;letter-spacing:-.015em}
+.head .title input.loc{font-size:15px;font-weight:500;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.seg button{min-height:44px;padding:0 14px;border:none;background:transparent;font-weight:600;font-size:14px;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.prog{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;width:100%}
+.prog .bar{flex:1;height:7px}
+.jump{position:sticky;top:calc(env(safe-area-inset-top,0px) + 66px);z-index:10;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding-block:8px;scrollbar-width:none}
+.jump::-webkit-scrollbar{display:none}
+.jump button{flex:none;min-height:38px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:14px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.jump button small{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.jump button.done{border-color:color-mix(in srgb,var(--ok) 55%,var(--line))}
+.jump button.done small{color:var(--ok)}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-block:14px;scroll-margin-top:140px}
+section.card>h3{margin:0;padding:14px 16px;font-size:16px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:1px solid var(--line)}
+section.card>h3 small{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:500}
+section.card>h3 .tag{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;padding:14px 16px}
+.item{padding:12px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:center}
+.item+.item{border-top:1px solid var(--line)}
+.item .lbl{font-weight:500}
+.item .lbl small{display:block;font-size:13px;color:var(--muted);font-weight:400}
+.item textarea{grid-column:1/-1;min-height:44px;height:44px;font-size:15px;background:var(--sunk)}
+.item textarea:focus{height:96px}
+.chips{display:flex;gap:6px}
+.chips button{min-width:60px;min-height:44px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:14px;font-weight:600;color:var(--muted)}
+.chips button[data-e="bien"][aria-pressed="true"]{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.chips button[data-e="reg"][aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.chips button[data-e="mal"][aria-pressed="true"]{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.chips button[data-e="na"][aria-pressed="true"]{background:var(--na-soft);border-color:var(--na);color:var(--ink)}
+.item.st-mal{box-shadow:inset 3px 0 0 var(--bad)} .item.st-reg{box-shadow:inset 3px 0 0 var(--warn)}
+.pad{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.hform{display:grid;grid-template-columns:170px 1fr;gap:10px}
+.hform .wide{grid-column:1/-1}
+.hl{display:flex;flex-direction:column;gap:8px}
+.h{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;align-items:start}
+.lv{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.lv.l0{background:var(--bad);color:#fff} .lv.l1{background:var(--bad-soft);color:var(--bad)}
+.lv.l2{background:var(--warn-soft);color:var(--warn)} .lv.l3{background:var(--na-soft);color:var(--na)}
+.h .d{min-width:0;overflow-wrap:anywhere} .h .d small{display:block;color:var(--muted);font-size:13px}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.ph{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk);display:flex;flex-direction:column}
+.ph img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:var(--line);max-width:100%}
+.ph div{padding:6px 8px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;gap:6px;align-items:center}
+.ph button{border:none;background:none;color:var(--bad);font-size:12.5px;font-weight:600;min-height:32px;padding:0 4px}
+.filebtn{position:relative;overflow:hidden;align-self:flex-start}
+.filebtn input{position:absolute;inset:0;opacity:0;font-size:0;cursor:pointer}
+.empty{padding:50px 20px;text-align:center;color:var(--muted);max-width:520px;margin:0 auto}
+.empty b{display:block;color:var(--ink);font-size:19px;margin-bottom:6px}
+.note{font-size:13px;color:var(--muted);margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;max-width:calc(100% - 32px)}
+.switch{display:inline-flex;align-items:center;gap:10px;font-size:14px;min-height:44px}
+.switch input{width:22px;height:22px;accent-color:var(--accent)}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  .side{border-right:none;border-bottom:1px solid var(--line);padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .offices{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .off{min-width:200px}
+  .main{padding-left:max(16px,env(safe-area-inset-left,0px))}
+  .jump{top:calc(env(safe-area-inset-top,0px) + 110px)}
+  .item{grid-template-columns:1fr}
+  .chips button{flex:1;min-width:0}
+  .hform{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><b>Gira TIC · Región Continental</b><span>INSESO · Informática y Transformación Digital</span></div>
+  <span class="sync" id="sync"><i></i><span id="syncText">Guardado en el iPad</span></span>
+</header>
+<div class="banner" id="installBanner" hidden><b>Instale la app antes de salir:</b> en Safari toque Compartir y luego «Añadir a pantalla de inicio». Use siempre el icono «Gira TIC» para que funcione sin conexión.</div>
+
+<div class="app">
+  <aside class="side">
+    <h2>Oficinas</h2>
+    <div class="offices" id="offices"></div>
+    <form class="box" id="addoff" autocomplete="off">
+      <h2>Añadir oficina</h2>
+      <input type="text" id="newName" placeholder="Nombre de la oficina" aria-label="Nombre de la oficina">
+      <div class="row"><input type="text" id="newLoc" placeholder="Localidad" aria-label="Localidad"><button class="btn primary" type="submit">Añadir</button></div>
+    </form>
+    <div class="box">
+      <h2>Copias y envío</h2>
+      <button class="btn" type="button" id="expJson">Exportar todo con fotos</button>
+      <button class="btn" type="button" id="expCsv">Exportar para Excel</button>
+      <label class="btn filebtn">Importar una copia<input type="file" id="impFile" accept=".json,application/json"></label>
+      <p class="note" id="expNote"></p>
+    </div>
+    <p class="note" id="offlineNote">Todo se guarda en este iPad al momento, sin necesidad de Internet.</p>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const AREAS=[
+ {k:'internet',t:'Internet',items:[['i1','Proveedor, tecnología y titular del contrato','Fibra, radio, VSAT, 4G; coste mensual'],['i2','Velocidad medida y estabilidad','Prueba a distintas horas'],['i3','Cortes en el último mes','Frecuencia, duración, quién los resuelve'],['i4','Router del proveedor','Modelo, quién tiene la contraseña, IP fija']]},
+ {k:'interconexion',t:'Interconexión',items:[['x1','Proveedores con cobertura real en la localidad',''],['x2','Punto de entrada y canalización para el enlace',''],['x3','Viabilidad de radioenlace','Línea de visión, azotea, mástil']]},
+ {k:'red',t:'Red y cableado',items:[['r1','Rack o armario de comunicaciones','Ubicación, cerradura, ventilación, orden'],['r2','Switches','Marca, modelo, puertos, gestionable'],['r3','Cableado y tomas de red','Categoría, tomas rotas, cables a la vista'],['r4','Etiquetado y código de colores','Datos, Teléfono, Cámaras, WiFi'],['r5','Croquis de la oficina','Puestos, rack y recorridos'],['r6','Direccionamiento IP','DHCP o fijo, rango usado']]},
+ {k:'wifi',t:'WiFi',items:[['w1','Puntos de acceso y cobertura por sala',''],['w2','Separación WiFi corporativa / invitados',''],['w3','Redes ajenas o domésticas conectadas','']]},
+ {k:'energia',t:'Energía',items:[['e1','SAI y autonomía real','Estado de baterías, equipos protegidos'],['e2','Grupo electrógeno o estabilizador',''],['e3','Toma de tierra y cuadro eléctrico',''],['e4','Cuarto técnico','Climatización, humedad, polvo, extintor']]},
+ {k:'equipos',t:'Equipos',items:[['q1','Recuento de equipos por Servicio','Sobremesa, portátiles, monitores'],['q2','Estado y antigüedad del parque',''],['q3','Equipos sin etiqueta o fuera de dominio',''],['q4','Equipos inservibles para baja',''],['q5','Puestos sin equipo o compartidos','']]},
+ {k:'impresoras',t:'Impresoras',items:[['p1','Impresoras y conexión','Red o USB, estado, contador'],['p2','Tipo de tóner o cartucho y stock',''],['p3','Escáneres y equipos de carné','']]},
+ {k:'software',t:'Software y AGRESSO',items:[['s1','Sistema operativo y ofimática con licencia',''],['s2','Acceso y uso de AGRESSO','Cómo trabajan hoy sin red con la sede'],['s3','Antivirus vigente y actualizado',''],['s4','Actualizaciones de Windows',''],['s5','Software no autorizado instalado','']]},
+ {k:'seguridad',t:'Seguridad y datos',items:[['d1','Cuentas y contraseñas','Propias o compartidas, a la vista'],['d2','Uso de USB y correo personal',''],['d3','Dónde se guardan los ficheros',''],['d4','Copias de seguridad',''],['d5','Videovigilancia','Cámaras, grabador, días de grabación'],['d6','Acceso físico al rack y al cuarto técnico','']]},
+ {k:'usuarios',t:'Usuarios',items:[['u1','Incidencias más frecuentes',''],['u2','Tiempo de respuesta y enlace informático local',''],['u3','Necesidades de formación','Ofimática, AGRESSO, seguridad'],['u4','Ubicación del control de asistencia','Punto de red y corriente'],['u5','Telefonía de la oficina','']]}
+];
+const BATA={k:'contingencia',t:'Centro de contingencia',items:[['b1','Sala candidata a CPD','Superficie, carga eléctrica, clima, seguridad'],['b2','Espacio para servidores, cabina y switches SAN',''],['b3','Enlace actual Sede–Bata','Tecnología, velocidad, estabilidad'],['b4','Enlaces desde Bata a las demás oficinas',''],['b5','Personal local para manos remotas','']]};
+const EST=[['bien','Bien'],['reg','Regular'],['mal','Mal'],['na','N/A']];
+const EST_TXT={bien:'Bien',reg:'Regular',mal:'Mal',na:'No aplica'};
+const NIVELES=['Crítico','Alto','Medio','Bajo'];
+const ESTADOS=['Pendiente','En curso','Completada'];
+const DATOS=[['proveedor','Proveedor de Internet',0],['tecnologia','Tecnología del enlace',0],['bajada','Bajada medida (Mbps)',1],['subida','Subida medida (Mbps)',1],['usuarios','N.º de usuarios',1],['pcs','N.º de PCs de sobremesa',1],['portatiles','N.º de portátiles',1],['impresoras','N.º de impresoras',1],['puntos','Puntos de red activos',1],['puntosNec','Puntos de red necesarios',1]];
+const INFO=[['fecha','Fecha de visita','date'],['responsable','Responsable de la oficina','text'],['telefono','Teléfono','tel'],['equipo','Equipo visitante','text'],['empleados','N.º de empleados','num'],['servicios','Servicios presentes','text']];
+
+const LS='inseso-gira-tic-offline-v1';
+const S={docs:{},current:null,lastExport:0};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3200)}
+
+/* ---------- almacenamiento local ---------- */
+let saveOk=true;
+function loadLocal(){try{const r=localStorage.getItem(LS);if(r){const o=JSON.parse(r);S.docs=o.docs||{};S.current=o.current||null;S.lastExport=o.lastExport||0}}catch(e){saveOk=false}}
+function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(S));saveOk=true}catch(e){saveOk=false;toast('No se pudo guardar en el iPad. Exporte una copia ahora.')}setStatus()}
+function touch(id){const d=S.docs[id];if(!d)return;d.updatedAt=Date.now();saveLocal()}
+let idb=null;
+function openIDB(){return new Promise((res,rej)=>{const r=indexedDB.open('gira-tic-fotos',1);
+  r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('fotos')){const s=d.createObjectStore('fotos',{keyPath:'id'});s.createIndex('doc','docId')}};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+const pReq=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const store=m=>idb.transaction('fotos',m).objectStore('fotos');
+const putFoto=f=>pReq(store('readwrite').put(f));
+const delFoto=id=>pReq(store('readwrite').delete(id));
+const fotosDe=docId=>idb?pReq(store('readonly').index('doc').getAll(docId)):Promise.resolve([]);
+const allFotos=()=>idb?pReq(store('readonly').getAll()):Promise.resolve([]);
+const fotoCount={};const urls=[];
+
+/* ---------- utilidades ---------- */
+function areasFor(d){return d.contingencia?[BATA,...AREAS]:AREAS}
+function stats(d){let tot=0,done=0,mal=0;for(const a of areasFor(d))for(const [k] of a.items){tot++;const e=d.items?.[k]?.e;if(e)done++;if(e==='mal')mal++}
+  const crit=(d.hallazgos||[]).filter(h=>h.nivel==='Crítico').length;return{tot,done,mal,crit,pct:tot?Math.round(done*100/tot):0}}
+function areaStats(d,a){let done=0;for(const [k] of a.items)if(d.items?.[k]?.e)done++;return{done,tot:a.items.length}}
+function fmtFecha(f){if(!f)return'Sin fecha';try{return new Intl.DateTimeFormat('es-ES',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(f+'T00:00:00Z'))}catch(e){return f}}
+function sorted(){return Object.entries(S.docs).sort(([,a],[,b])=>((a.info?.fecha||'9999')+a.nombre).localeCompare((b.info?.fecha||'9999')+b.nombre))}
+function newDoc(nombre,localidad,extra){return Object.assign({nombre,localidad,contingencia:/bata/i.test(nombre+' '+localidad),estado:'Pendiente',info:{},datos:{},items:{},hallazgos:[],acuerdos:'',creado:Date.now(),updatedAt:Date.now()},extra||{})}
+function slug(s){return (s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'oficina')+'-'+Math.random().toString(36).slice(2,6)}
+function setPath(o,p,v){const k=p.split('.');let t=o;for(let i=0;i<k.length-1;i++)t=t[k[i]]=t[k[i]]||{};t[k[k.length-1]]=v}
+function isEditing(){const a=document.activeElement;return a&&$('#main').contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)}
+function arm(btn,label,fn){if(btn.classList.contains('armed')){btn.classList.remove('armed');fn();return}const old=btn.textContent;btn.classList.add('armed');btn.textContent=label;setTimeout(()=>{if(btn.isConnected&&btn.classList.contains('armed')){btn.classList.remove('armed');btn.textContent=old}},4000)}
+function setStatus(){
+  const pend=Object.values(S.docs).filter(d=>(d.updatedAt||0)>S.lastExport).length;
+  const el=$('#sync');
+  if(!saveOk){el.dataset.s='warn';$('#syncText').textContent='Error al guardar';return}
+  el.dataset.s=pend?'warn':'ok';
+  $('#syncText').textContent=pend?`Guardado en el iPad · ${pend} sin exportar`:'Guardado en el iPad';
+  $('#expNote').textContent=S.lastExport?'Última exportación: '+new Date(S.lastExport).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Exporte una copia al final de cada visita y guárdela en Archivos.';
+}
+
+/* ---------- render ---------- */
+function renderSide(){
+  const list=sorted();
+  $('#offices').innerHTML=list.length?list.map(([id,d])=>{const s=stats(d);const cls=(d.estado||'Pendiente').toLowerCase().replace(' ','');
+    return `<button class="off" type="button" data-off="${id}" aria-current="${id===S.current}">
+      <span class="n"><span>${esc(d.nombre)}</span><span class="pill ${cls}">${esc(d.estado||'Pendiente')}</span></span>
+      <span class="m"><span>${esc(d.localidad||'')}</span><span>${fmtFecha(d.info?.fecha)}</span>${s.crit?`<span class="crit">${s.crit} crítico${s.crit>1?'s':''}</span>`:''}</span>
+      <span class="bar"><b style="width:${s.pct}%"></b></span></button>`}).join(''):'<p class="note">Aún no hay oficinas. Añada la primera abajo.</p>';
+}
+function renderMain(){
+  const m=$('#main');const id=S.current,d=S.docs[id];
+  if(!d){m.innerHTML=`<div class="empty"><b>Elija o añada una oficina</b>Cada oficina tiene su ficha: apertura, datos clave, ${AREAS.length} áreas de revisión, fotos, hallazgos y cierre.</div>`;return}
+  const areas=areasFor(d);
+  m.innerHTML=`
+  <div class="head">
+    <div class="title"><input type="text" id="f-nombre" data-f="nombre" value="${esc(d.nombre)}" aria-label="Nombre de la oficina">
+      <input type="text" class="loc" id="f-localidad" data-f="localidad" value="${esc(d.localidad)}" placeholder="Localidad" aria-label="Localidad"></div>
+    <div class="seg" role="group" aria-label="Estado de la visita">${ESTADOS.map(e=>`<button type="button" data-estado="${e}" aria-pressed="${(d.estado||'Pendiente')===e}">${e}</button>`).join('')}</div>
+    <div class="prog" id="prog"></div>
+  </div>
+  <nav class="jump" id="jump" aria-label="Secciones"></nav>
+  <section class="card" id="sec-apertura"><h3><span>Apertura de la visita</span></h3>
+    <div class="grid">${INFO.map(([k,l,t])=>`<label class="f">${l}<input type="${t==='num'?'text':t}" ${t==='num'?'inputmode="numeric"':''} id="info-${k}" data-f="info.${k}" value="${esc(d.info?.[k])}"></label>`).join('')}
+      <label class="switch"><input type="checkbox" id="f-cont" ${d.contingencia?'checked':''}> Centro de contingencia (Bata)</label></div></section>
+  <section class="card" id="sec-datos"><h3><span>Datos clave</span><small>cifras para el informe</small></h3>
+    <div class="grid">${DATOS.map(([k,l,n])=>`<label class="f">${l}<input type="text" ${n?'inputmode="decimal"':''} id="dat-${k}" data-f="datos.${k}" value="${esc(d.datos?.[k])}"></label>`).join('')}</div></section>
+  ${areas.map(a=>`<section class="card" id="sec-${a.k}"><h3><span>${a.k==='contingencia'?'<span class="tag">Solo Bata · </span>':''}${a.t}</span><small id="cnt-${a.k}"></small></h3>
+    ${a.items.map(([k,l,h])=>{const it=d.items?.[k]||{};return `<div class="item ${it.e?'st-'+it.e:''}" id="it-${k}">
+      <div class="lbl">${l}${h?`<small>${h}</small>`:''}</div>
+      <div class="chips" role="group" aria-label="${esc(l)}">${EST.map(([e,t])=>`<button type="button" data-item="${k}" data-e="${e}" aria-pressed="${it.e===e}">${t}</button>`).join('')}</div>
+      <textarea id="nota-${k}" data-nota="${k}" placeholder="Observaciones">${esc(it.n)}</textarea></div>`}).join('')}</section>`).join('')}
+  <section class="card" id="sec-fotos"><h3><span>Fotografías</span><small id="cnt-fotos"></small></h3>
+    <div class="pad">
+      <div class="hform"><select id="ph-area" aria-label="Área de la foto">${areas.map(a=>`<option>${a.t}</option>`).join('')}<option>General</option></select>
+        <input type="text" id="ph-pie" placeholder="Pie de foto (opcional)" aria-label="Pie de foto"></div>
+      <label class="btn primary filebtn">Hacer o elegir foto<input type="file" id="ph-file" accept="image/*" multiple></label>
+      <div class="photos" id="photos"></div></div></section>
+  <section class="card" id="sec-hallazgos"><h3><span>Hallazgos</span><small id="cnt-h"></small></h3>
+    <div class="pad">
+      <div class="hform"><select id="h-nivel" aria-label="Nivel">${NIVELES.map(n=>`<option>${n}</option>`).join('')}</select>
+        <select id="h-area" aria-label="Área">${areas.map(a=>`<option>${a.t}</option>`).join('')}<option>General</option></select>
+        <textarea class="wide" id="h-desc" placeholder="Qué se ha encontrado" rows="2"></textarea>
+        <textarea class="wide" id="h-acc" placeholder="Acción propuesta y plazo" rows="2"></textarea></div>
+      <button class="btn primary" type="button" id="h-add" style="align-self:flex-start">Añadir hallazgo</button>
+      <div class="hl" id="hl"></div></div></section>
+  <section class="card" id="sec-cierre"><h3><span>Cierre de la visita</span></h3>
+    <div class="pad"><label class="f">Acuerdos inmediatos con el responsable<textarea id="f-acuerdos" data-f="acuerdos" rows="3">${esc(d.acuerdos)}</textarea></label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between">
+        <button class="btn primary" type="button" data-estado="Completada">Marcar visita como completada</button>
+        <button class="btn danger" type="button" id="delOff">Eliminar oficina</button></div></div></section>`;
+  refreshCounts();renderHallazgos();renderPhotos();
+}
+function refreshCounts(){
+  const d=S.docs[S.current];if(!d)return;const s=stats(d);
+  $('#prog').innerHTML=`<span>${s.done} de ${s.tot} puntos revisados</span><span class="bar"><b style="width:${s.pct}%"></b></span><span>${s.pct}%</span>`;
+  const areas=areasFor(d);
+  $('#jump').innerHTML=[['apertura','Apertura'],['datos','Datos']].map(([k,t])=>`<button type="button" data-jump="${k}">${t}</button>`).join('')+
+    areas.map(a=>{const x=areaStats(d,a);return `<button type="button" data-jump="${a.k}" class="${x.done===x.tot?'done':''}">${a.t}<small>${x.done}/${x.tot}</small></button>`}).join('')+
+    `<button type="button" data-jump="fotos">Fotos<small>${fotoCount[S.current]||0}</small></button><button type="button" data-jump="hallazgos">Hallazgos<small>${(d.hallazgos||[]).length}</small></button><button type="button" data-jump="cierre">Cierre</button>`;
+  for(const a of areas){const x=areaStats(d,a);const el=document.getElementById('cnt-'+a.k);if(el)el.textContent=`${x.done}/${x.tot}`}
+}
+function renderHallazgos(){
+  const d=S.docs[S.current];if(!d)return;const hs=d.hallazgos||[];const ord=h=>NIVELES.indexOf(h.nivel);
+  $('#cnt-h').textContent=hs.length?String(hs.length):'';
+  $('#hl').innerHTML=hs.length?[...hs].sort((a,b)=>ord(a)-ord(b)).map(h=>`<div class="h"><span class="lv l${ord(h)}">${esc(h.nivel)}</span>
+    <div class="d"><small>${esc(h.area)}</small>${esc(h.desc)}${h.acc?`<small>Acción: ${esc(h.acc)}</small>`:''}</div>
+    <button class="btn danger" type="button" data-delh="${h.id}" style="min-height:36px;padding:0 10px;font-size:13px">Quitar</button></div>`).join(''):'<p class="note">Sin hallazgos. Clasifíquelos como Crítico, Alto, Medio o Bajo al detectarlos.</p>';
+}
+async function renderPhotos(){
+  const id=S.current;const el=$('#photos');if(!el)return;
+  let fs=[];try{fs=await fotosDe(id)}catch(e){}
+  if(id!==S.current||!document.getElementById('photos'))return;
+  while(urls.length)URL.revokeObjectURL(urls.pop());
+  fs.sort((a,b)=>a.t-b.t);fotoCount[id]=fs.length;
+  el.innerHTML=fs.map(f=>{const u=URL.createObjectURL(f.blob);urls.push(u);return `<div class="ph"><img src="${u}" alt="${esc(f.pie||f.area)}"><div><span>${esc(f.area)}${f.pie?' · '+esc(f.pie):''}</span><button type="button" data-delph="${esc(f.id)}">Quitar</button></div></div>`}).join('')
+    ||'<p class="note">Sin fotos. Fotografíe rack, cuadro eléctrico, cableado y equipos críticos.</p>';
+  $('#cnt-fotos').textContent=fs.length?String(fs.length):'';
+  refreshCounts();
+}
+function shrink(file){return new Promise(res=>{const u=URL.createObjectURL(file);const im=new Image();
+  im.onload=()=>{const m=1600;let w=im.naturalWidth,h=im.naturalHeight;const s=Math.min(1,m/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);
+    const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);c.toBlob(b=>{URL.revokeObjectURL(u);res(b||file)},'image/jpeg',.8)};
+  im.onerror=()=>{URL.revokeObjectURL(u);res(file)};im.src=u})}
+
+/* ---------- eventos ---------- */
+$('#offices').addEventListener('click',e=>{const b=e.target.closest('[data-off]');if(!b)return;S.current=b.dataset.off;saveLocal();renderSide();renderMain();window.scrollTo(0,0)});
+$('#addoff').addEventListener('submit',e=>{e.preventDefault();const n=$('#newName').value.trim(),l=$('#newLoc').value.trim();if(!n){$('#newName').focus();return}
+  const id=slug(n);S.docs[id]=newDoc(n,l);S.current=id;$('#newName').value='';$('#newLoc').value='';$('#newName').blur();$('#newLoc').blur();saveLocal();renderSide();renderMain();toast('Oficina añadida')});
+const main=$('#main');
+main.addEventListener('input',e=>{const t=e.target,d=S.docs[S.current];if(!d)return;
+  if(t.dataset.f){setPath(d,t.dataset.f,t.value);touch(S.current);if(/^(nombre|localidad|info\.fecha)$/.test(t.dataset.f))renderSide()}
+  else if(t.dataset.nota){const k=t.dataset.nota;d.items=d.items||{};d.items[k]=Object.assign({},d.items[k],{n:t.value});touch(S.current)}});
+main.addEventListener('change',async e=>{const t=e.target,d=S.docs[S.current];if(!d)return;
+  if(t.id==='f-cont'){d.contingencia=t.checked;touch(S.current);renderMain();return}
+  if(t.id==='ph-file'&&t.files&&t.files.length){
+    if(!idb){toast('Este iPad no permite guardar fotos en la app.');return}
+    const area=$('#ph-area').value,pie=$('#ph-pie').value.trim(),files=[...t.files],docId=S.current;t.value='';$('#ph-pie').value='';
+    let ok=0;for(const f of files){try{const blob=await shrink(f);await putFoto({id:'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),docId,area,pie,t:Date.now(),blob});ok++}catch(err){}}
+    if(S.docs[docId]){touch(docId)}
+    toast(ok?`${ok} foto${ok>1?'s':''} guardada${ok>1?'s':''} en el iPad`:'No se pudo guardar la foto. Libere espacio en el iPad.');renderPhotos()}});
+main.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const d=S.docs[S.current];if(!d)return;
+  if(t.dataset.item){const k=t.dataset.item,v=t.dataset.e;d.items=d.items||{};const cur=d.items[k]?.e;d.items[k]=Object.assign({},d.items[k],{e:cur===v?'':v});
+    const row=document.getElementById('it-'+k);row.className='item'+(d.items[k].e?' st-'+d.items[k].e:'');row.querySelectorAll('.chips button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.e===d.items[k].e)));
+    if((d.estado||'Pendiente')==='Pendiente'){d.estado='En curso';main.querySelectorAll('.seg [data-estado]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.estado==='En curso')))}
+    touch(S.current);refreshCounts();renderSide();return}
+  if(t.dataset.estado){d.estado=t.dataset.estado;touch(S.current);main.querySelectorAll('.seg [data-estado]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.estado===d.estado)));renderSide();if(t.closest('#sec-cierre'))toast('Visita marcada como completada. Exporte una copia.');return}
+  if(t.dataset.jump){document.getElementById('sec-'+t.dataset.jump)?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});return}
+  if(t.id==='h-add'){const desc=$('#h-desc').value.trim();if(!desc){$('#h-desc').focus();return}
+    (d.hallazgos=d.hallazgos||[]).push({id:'h'+Date.now().toString(36),nivel:$('#h-nivel').value,area:$('#h-area').value,desc,acc:$('#h-acc').value.trim(),t:Date.now()});
+    $('#h-desc').value='';$('#h-acc').value='';touch(S.current);renderHallazgos();refreshCounts();renderSide();toast('Hallazgo añadido');return}
+  if(t.dataset.delh){arm(t,'Confirmar',()=>{d.hallazgos=(d.hallazgos||[]).filter(h=>h.id!==t.dataset.delh);touch(S.current);renderHallazgos();refreshCounts();renderSide()});return}
+  if(t.dataset.delph){arm(t,'¿Seguro?',async()=>{try{await delFoto(t.dataset.delph);touch(S.current)}catch(err){toast('No se pudo quitar la foto.')}renderPhotos()});return}
+  if(t.id==='delOff'){arm(t,'Pulse otra vez para eliminar',async()=>{const id=S.current;delete S.docs[id];
+    try{for(const f of await fotosDe(id))await delFoto(f.id)}catch(err){}
+    S.current=sorted()[0]?.[0]||null;saveLocal();renderSide();renderMain();toast('Oficina eliminada')});return}
+});
+
+/* ---------- exportar / importar ---------- */
+const today=()=>new Date().toISOString().slice(0,10);
+async function deliver(blob,filename){
+  const file=new File([blob],filename,{type:blob.type});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:filename});return true}}
+  catch(e){if(e&&e.name==='AbortError')return false}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return true}
+const toDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b)});
+$('#expJson').addEventListener('click',async()=>{
+  toast('Preparando la copia…');
+  const fs=await allFotos().catch(()=>[]);const fotos=[];
+  for(const f of fs){try{fotos.push({id:f.id,docId:f.docId,area:f.area,pie:f.pie,t:f.t,dataUrl:await toDataURL(f.blob)})}catch(e){}}
+  const data={app:'gira-tic-inseso',version:1,exportado:new Date().toISOString(),oficinas:S.docs,fotos};
+  const ok=await deliver(new Blob([JSON.stringify(data)],{type:'application/json'}),`Gira_TIC_Continental_${today()}.json`);
+  if(ok){S.lastExport=Date.now();saveLocal()}});
+function csvCell(v){v=String(v??'');return /[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+$('#expCsv').addEventListener('click',async()=>{
+  const rows=[['Oficina','Localidad','Fecha visita','Estado visita','Tipo','Área','Punto','Valoración / Nivel','Observaciones','Acción propuesta']];
+  for(const [,d] of sorted()){const base=[d.nombre,d.localidad,d.info?.fecha||'',d.estado||'Pendiente'];
+    for(const [k,l] of INFO)if(d.info?.[k])rows.push([...base,'Apertura','',l,'',d.info[k],'']);
+    for(const [k,l] of DATOS)if(d.datos?.[k])rows.push([...base,'Dato clave','',l,'',d.datos[k],'']);
+    for(const a of areasFor(d))for(const [k,l] of a.items){const it=d.items?.[k]||{};rows.push([...base,'Revisión',a.t,l,EST_TXT[it.e]||'',it.n||'',''])}
+    for(const h of d.hallazgos||[])rows.push([...base,'Hallazgo',h.area,'',h.nivel,h.desc,h.acc||'']);
+    if(d.acuerdos)rows.push([...base,'Cierre','','Acuerdos inmediatos','',d.acuerdos,''])}
+  const csv='﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
+  await deliver(new Blob([csv],{type:'text/csv'}),`Gira_TIC_Continental_${today()}.csv`)});
+$('#impFile').addEventListener('change',async e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  try{const o=JSON.parse(await f.text());if(o.app!=='gira-tic-inseso')throw new Error('formato');
+    let n=0;for(const [id,d] of Object.entries(o.oficinas||{})){const l=S.docs[id];if(!l||(d.updatedAt||0)>(l.updatedAt||0)){S.docs[id]=d;n++}}
+    let p=0;if(idb)for(const ph of o.fotos||[]){try{const blob=await (await fetch(ph.dataUrl)).blob();await putFoto({id:ph.id,docId:ph.docId,area:ph.area,pie:ph.pie,t:ph.t,blob});p++}catch(err){}}
+    if(!S.current||!S.docs[S.current])S.current=sorted()[0]?.[0]||null;
+    saveLocal();renderSide();renderMain();toast(`Copia importada: ${n} oficina${n!==1?'s':''} actualizada${n!==1?'s':''}, ${p} foto${p!==1?'s':''}.`)}
+  catch(err){toast('Ese archivo no es una copia de la Gira TIC.')}});
+
+/* ---------- arranque ---------- */
+loadLocal();
+if(!Object.keys(S.docs).length){S.docs['bata']=newDoc('Bata','Bata',{contingencia:true,info:{fecha:'2026-10-19'}});S.current='bata';saveLocal()}
+if(!S.current||!S.docs[S.current])S.current=sorted()[0]?.[0]||null;
+renderSide();renderMain();setStatus();
+openIDB().then(db=>{idb=db;renderPhotos()}).catch(()=>{});
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+if(!standalone)$('#installBanner').hidden=false;
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').then(()=>navigator.serviceWorker.ready).then(()=>{$('#offlineNote').textContent='Lista para usar sin conexión. Todo se guarda en este iPad al momento.'}).catch(()=>{})}
+</script>
+</body>
+</html>
