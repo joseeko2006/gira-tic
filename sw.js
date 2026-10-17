@@ -1,10 +1,10 @@
 // Gira TIC INSESO — caché para funcionar sin conexión.
 // Al publicar una versión nueva, cambie V para que los iPad la descarguen.
-const V = 'gira-tic-v1';
+const V = 'gira-tic-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(V).then(c => c.addAll(FILES.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

@@ -128,6 +128,13 @@ section.card>h3 .tag{font-size:11.5px;text-transform:uppercase;letter-spacing:.0
 .empty b{display:block;color:var(--ink);font-size:19px;margin-bottom:6px}
 .note{font-size:13px;color:var(--muted);margin:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;max-width:calc(100% - 32px)}
+details summary{cursor:pointer;font-size:14px;color:var(--muted);min-height:36px;display:flex;align-items:center}
+.cfg{display:flex;flex-direction:column;gap:8px;padding-top:6px}
+input[type=password]{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:9px 11px;font-size:16px;-webkit-appearance:none;appearance:none}
+.tform{display:grid;grid-template-columns:2fr 1.5fr 1fr;gap:10px}
+.tl{display:flex;flex-direction:column;gap:8px}
+.t{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
+.t b{font-weight:600}.t small{display:block;color:var(--muted);font-size:13px}
 .switch{display:inline-flex;align-items:center;gap:10px;font-size:14px;min-height:44px}
 .switch input{width:22px;height:22px;accent-color:var(--accent)}
 @media (max-width:760px){
@@ -140,6 +147,7 @@ section.card>h3 .tag{font-size:11.5px;text-transform:uppercase;letter-spacing:.0
   .item{grid-template-columns:1fr}
   .chips button{flex:1;min-width:0}
   .hform{grid-template-columns:1fr}
+  .tform{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
@@ -160,6 +168,19 @@ section.card>h3 .tag{font-size:11.5px;text-transform:uppercase;letter-spacing:.0
       <input type="text" id="newName" placeholder="Nombre de la oficina" aria-label="Nombre de la oficina">
       <div class="row"><input type="text" id="newLoc" placeholder="Localidad" aria-label="Localidad"><button class="btn primary" type="submit">Añadir</button></div>
     </form>
+    <div class="box" id="syncBox">
+      <h2>Sincronización</h2>
+      <button class="btn primary" type="button" id="syncGo">Sincronizar</button>
+      <p class="note" id="syncNote">Sin configurar. Los datos solo están en este dispositivo.</p>
+      <details id="syncCfg">
+        <summary>Configurar clave de acceso</summary>
+        <div class="cfg">
+          <label class="f">Clave de GitHub (github_pat_…)<input type="password" id="syncToken" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+          <button class="btn" type="button" id="syncSave">Guardar y probar</button>
+          <button class="btn danger" type="button" id="syncForget">Olvidar clave en este dispositivo</button>
+        </div>
+      </details>
+    </div>
     <div class="box">
       <h2>Copias y envío</h2>
       <button class="btn" type="button" id="expJson">Exportar todo con fotos</button>
@@ -195,16 +216,16 @@ const DATOS=[['proveedor','Proveedor de Internet',0],['tecnologia','Tecnología 
 const INFO=[['fecha','Fecha de visita','date'],['responsable','Responsable de la oficina','text'],['telefono','Teléfono','tel'],['equipo','Equipo visitante','text'],['empleados','N.º de empleados','num'],['servicios','Servicios presentes','text']];
 
 const LS='inseso-gira-tic-offline-v1';
-const S={docs:{},current:null,lastExport:0};
+const S={docs:{},current:null,lastExport:0,sha:{},synced:{},borrados:{},lastSync:0};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3200)}
 
 /* ---------- almacenamiento local ---------- */
 let saveOk=true;
-function loadLocal(){try{const r=localStorage.getItem(LS);if(r){const o=JSON.parse(r);S.docs=o.docs||{};S.current=o.current||null;S.lastExport=o.lastExport||0}}catch(e){saveOk=false}}
+function loadLocal(){try{const r=localStorage.getItem(LS);if(r){const o=JSON.parse(r);S.docs=o.docs||{};S.current=o.current||null;S.lastExport=o.lastExport||0;S.sha=o.sha||{};S.synced=o.synced||{};S.borrados=o.borrados||{};S.lastSync=o.lastSync||0}}catch(e){saveOk=false}}
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(S));saveOk=true}catch(e){saveOk=false;toast('No se pudo guardar en el iPad. Exporte una copia ahora.')}setStatus()}
-function touch(id){const d=S.docs[id];if(!d)return;d.updatedAt=Date.now();saveLocal()}
+function touch(id){const d=S.docs[id];if(!d)return;d.updatedAt=Date.now();saveLocal();autoSync(30000)}
 let idb=null;
 function openIDB(){return new Promise((res,rej)=>{const r=indexedDB.open('gira-tic-fotos',1);
   r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('fotos')){const s=d.createObjectStore('fotos',{keyPath:'id'});s.createIndex('doc','docId')}};
@@ -230,11 +251,23 @@ function setPath(o,p,v){const k=p.split('.');let t=o;for(let i=0;i<k.length-1;i+
 function isEditing(){const a=document.activeElement;return a&&$('#main').contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)}
 function arm(btn,label,fn){if(btn.classList.contains('armed')){btn.classList.remove('armed');fn();return}const old=btn.textContent;btn.classList.add('armed');btn.textContent=label;setTimeout(()=>{if(btn.isConnected&&btn.classList.contains('armed')){btn.classList.remove('armed');btn.textContent=old}},4000)}
 function setStatus(){
-  const pend=Object.values(S.docs).filter(d=>(d.updatedAt||0)>S.lastExport).length;
   const el=$('#sync');
   if(!saveOk){el.dataset.s='warn';$('#syncText').textContent='Error al guardar';return}
-  el.dataset.s=pend?'warn':'ok';
-  $('#syncText').textContent=pend?`Guardado en el iPad · ${pend} sin exportar`:'Guardado en el iPad';
+  if(token){
+    const n=pendientesSync();let t,w=true;
+    if(syncing)t='Sincronizando…';
+    else if(syncErr)t='Sincronización pendiente';
+    else if(n&&!navigator.onLine)t=`Sin conexión · ${n} por sincronizar`;
+    else if(n)t=`${n} cambio${n>1?'s':''} por sincronizar`;
+    else{t=S.lastSync?'Sincronizado · '+hora(S.lastSync):'Sincronizado';w=false}
+    el.dataset.s=w?'warn':'ok';$('#syncText').textContent=t;
+    $('#syncNote').textContent=syncErr||(S.lastSync?'Última sincronización: '+hora(S.lastSync)+'. Se sincroniza sola al haber Internet.':'Configurada. Pulse Sincronizar para el primer envío.');
+  }else{
+    const pend=Object.values(S.docs).filter(d=>(d.updatedAt||0)>S.lastExport).length;
+    el.dataset.s=pend?'warn':'ok';
+    $('#syncText').textContent=pend?`Guardado en el dispositivo · ${pend} sin exportar`:'Guardado en el dispositivo';
+    $('#syncNote').textContent='Sin configurar. Los datos solo están en este dispositivo.';
+  }
   $('#expNote').textContent=S.lastExport?'Última exportación: '+new Date(S.lastExport).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Exporte una copia al final de cada visita y guárdela en Archivos.';
 }
 
@@ -262,6 +295,13 @@ function renderMain(){
   <section class="card" id="sec-apertura"><h3><span>Apertura de la visita</span></h3>
     <div class="grid">${INFO.map(([k,l,t])=>`<label class="f">${l}<input type="${t==='num'?'text':t}" ${t==='num'?'inputmode="numeric"':''} id="info-${k}" data-f="info.${k}" value="${esc(d.info?.[k])}"></label>`).join('')}
       <label class="switch"><input type="checkbox" id="f-cont" ${d.contingencia?'checked':''}> Centro de contingencia (Bata)</label></div></section>
+  <section class="card" id="sec-tecnicos"><h3><span>Personal informático de la oficina</span><small id="cnt-tec"></small></h3>
+    <div class="pad">
+      <div class="tform"><input type="text" id="t-nombre" placeholder="Nombre y apellidos" aria-label="Nombre y apellidos" autocomplete="off">
+        <input type="text" id="t-cargo" placeholder="Cargo o función" aria-label="Cargo o función" autocomplete="off">
+        <input type="tel" id="t-tel" placeholder="Teléfono" aria-label="Teléfono" autocomplete="off"></div>
+      <button class="btn primary" type="button" id="t-add" style="align-self:flex-start">Añadir técnico</button>
+      <div class="tl" id="tl"></div></div></section>
   <section class="card" id="sec-datos"><h3><span>Datos clave</span><small>cifras para el informe</small></h3>
     <div class="grid">${DATOS.map(([k,l,n])=>`<label class="f">${l}<input type="text" ${n?'inputmode="decimal"':''} id="dat-${k}" data-f="datos.${k}" value="${esc(d.datos?.[k])}"></label>`).join('')}</div></section>
   ${areas.map(a=>`<section class="card" id="sec-${a.k}"><h3><span>${a.k==='contingencia'?'<span class="tag">Solo Bata · </span>':''}${a.t}</span><small id="cnt-${a.k}"></small></h3>
@@ -288,13 +328,20 @@ function renderMain(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between">
         <button class="btn primary" type="button" data-estado="Completada">Marcar visita como completada</button>
         <button class="btn danger" type="button" id="delOff">Eliminar oficina</button></div></div></section>`;
-  refreshCounts();renderHallazgos();renderPhotos();
+  refreshCounts();renderHallazgos();renderTecnicos();renderPhotos();
+}
+function renderTecnicos(){
+  const d=S.docs[S.current];const el=document.getElementById('tl');if(!d||!el)return;const ts=d.tecnicos||[];
+  $('#cnt-tec').textContent=ts.length?String(ts.length):'';
+  el.innerHTML=ts.length?ts.map(t=>`<div class="t"><div><b>${esc(t.nombre)}</b><small>${esc([t.cargo,t.tel].filter(Boolean).join(' · '))||'Sin cargo ni teléfono'}</small></div>
+    <button class="btn danger" type="button" data-delt="${esc(t.id)}" style="min-height:36px;padding:0 10px;font-size:13px">Quitar</button></div>`).join('')
+    :'<p class="note">Anote a cada técnico o enlace informático de la oficina: nombre, cargo y teléfono.</p>';
 }
 function refreshCounts(){
   const d=S.docs[S.current];if(!d)return;const s=stats(d);
   $('#prog').innerHTML=`<span>${s.done} de ${s.tot} puntos revisados</span><span class="bar"><b style="width:${s.pct}%"></b></span><span>${s.pct}%</span>`;
   const areas=areasFor(d);
-  $('#jump').innerHTML=[['apertura','Apertura'],['datos','Datos']].map(([k,t])=>`<button type="button" data-jump="${k}">${t}</button>`).join('')+
+  $('#jump').innerHTML=[['apertura','Apertura'],['tecnicos','Técnicos'],['datos','Datos']].map(([k,t])=>`<button type="button" data-jump="${k}">${t}</button>`).join('')+
     areas.map(a=>{const x=areaStats(d,a);return `<button type="button" data-jump="${a.k}" class="${x.done===x.tot?'done':''}">${a.t}<small>${x.done}/${x.tot}</small></button>`}).join('')+
     `<button type="button" data-jump="fotos">Fotos<small>${fotoCount[S.current]||0}</small></button><button type="button" data-jump="hallazgos">Hallazgos<small>${(d.hallazgos||[]).length}</small></button><button type="button" data-jump="cierre">Cierre</button>`;
   for(const a of areas){const x=areaStats(d,a);const el=document.getElementById('cnt-'+a.k);if(el)el.textContent=`${x.done}/${x.tot}`}
@@ -335,7 +382,8 @@ main.addEventListener('change',async e=>{const t=e.target,d=S.docs[S.current];if
   if(t.id==='ph-file'&&t.files&&t.files.length){
     if(!idb){toast('Este iPad no permite guardar fotos en la app.');return}
     const area=$('#ph-area').value,pie=$('#ph-pie').value.trim(),files=[...t.files],docId=S.current;t.value='';$('#ph-pie').value='';
-    let ok=0;for(const f of files){try{const blob=await shrink(f);await putFoto({id:'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),docId,area,pie,t:Date.now(),blob});ok++}catch(err){}}
+    let ok=0;for(const f of files){try{const blob=await shrink(f);const fid='f'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),ft=Date.now();
+      await putFoto({id:fid,docId,area,pie,t:ft,blob});const dd=S.docs[docId];if(dd)(dd.fotosApp=dd.fotosApp||[]).push({id:fid,area,pie,t:ft});ok++}catch(err){}}
     if(S.docs[docId]){touch(docId)}
     toast(ok?`${ok} foto${ok>1?'s':''} guardada${ok>1?'s':''} en el iPad`:'No se pudo guardar la foto. Libere espacio en el iPad.');renderPhotos()}});
 main.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const d=S.docs[S.current];if(!d)return;
@@ -345,12 +393,16 @@ main.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)retur
     touch(S.current);refreshCounts();renderSide();return}
   if(t.dataset.estado){d.estado=t.dataset.estado;touch(S.current);main.querySelectorAll('.seg [data-estado]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.estado===d.estado)));renderSide();if(t.closest('#sec-cierre'))toast('Visita marcada como completada. Exporte una copia.');return}
   if(t.dataset.jump){document.getElementById('sec-'+t.dataset.jump)?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});return}
+  if(t.id==='t-add'){const nombre=$('#t-nombre').value.trim();if(!nombre){$('#t-nombre').focus();return}
+    (d.tecnicos=d.tecnicos||[]).push({id:'t'+Date.now().toString(36),nombre,cargo:$('#t-cargo').value.trim(),tel:$('#t-tel').value.trim()});
+    $('#t-nombre').value='';$('#t-cargo').value='';$('#t-tel').value='';touch(S.current);renderTecnicos();toast('Técnico añadido');return}
+  if(t.dataset.delt){arm(t,'Confirmar',()=>{d.tecnicos=(d.tecnicos||[]).filter(x=>x.id!==t.dataset.delt);touch(S.current);renderTecnicos()});return}
   if(t.id==='h-add'){const desc=$('#h-desc').value.trim();if(!desc){$('#h-desc').focus();return}
     (d.hallazgos=d.hallazgos||[]).push({id:'h'+Date.now().toString(36),nivel:$('#h-nivel').value,area:$('#h-area').value,desc,acc:$('#h-acc').value.trim(),t:Date.now()});
     $('#h-desc').value='';$('#h-acc').value='';touch(S.current);renderHallazgos();refreshCounts();renderSide();toast('Hallazgo añadido');return}
   if(t.dataset.delh){arm(t,'Confirmar',()=>{d.hallazgos=(d.hallazgos||[]).filter(h=>h.id!==t.dataset.delh);touch(S.current);renderHallazgos();refreshCounts();renderSide()});return}
-  if(t.dataset.delph){arm(t,'¿Seguro?',async()=>{try{await delFoto(t.dataset.delph);touch(S.current)}catch(err){toast('No se pudo quitar la foto.')}renderPhotos()});return}
-  if(t.id==='delOff'){arm(t,'Pulse otra vez para eliminar',async()=>{const id=S.current;delete S.docs[id];
+  if(t.dataset.delph){arm(t,'¿Seguro?',async()=>{try{await delFoto(t.dataset.delph);d.fotosApp=(d.fotosApp||[]).filter(m=>m.id!==t.dataset.delph);touch(S.current)}catch(err){toast('No se pudo quitar la foto.')}renderPhotos()});return}
+  if(t.id==='delOff'){arm(t,'Pulse otra vez para eliminar',async()=>{const id=S.current;delete S.docs[id];if(S.sha[id])S.borrados[id]=true;delete S.sha[id];delete S.synced[id];
     try{for(const f of await fotosDe(id))await delFoto(f.id)}catch(err){}
     S.current=sorted()[0]?.[0]||null;saveLocal();renderSide();renderMain();toast('Oficina eliminada')});return}
 });
@@ -376,6 +428,7 @@ $('#expCsv').addEventListener('click',async()=>{
   const rows=[['Oficina','Localidad','Fecha visita','Estado visita','Tipo','Área','Punto','Valoración / Nivel','Observaciones','Acción propuesta']];
   for(const [,d] of sorted()){const base=[d.nombre,d.localidad,d.info?.fecha||'',d.estado||'Pendiente'];
     for(const [k,l] of INFO)if(d.info?.[k])rows.push([...base,'Apertura','',l,'',d.info[k],'']);
+    for(const t of d.tecnicos||[])rows.push([...base,'Técnico','',t.nombre,'',[t.cargo,t.tel].filter(Boolean).join(' · '),'']);
     for(const [k,l] of DATOS)if(d.datos?.[k])rows.push([...base,'Dato clave','',l,'',d.datos[k],'']);
     for(const a of areasFor(d))for(const [k,l] of a.items){const it=d.items?.[k]||{};rows.push([...base,'Revisión',a.t,l,EST_TXT[it.e]||'',it.n||'',''])}
     for(const h of d.hallazgos||[])rows.push([...base,'Hallazgo',h.area,'',h.nivel,h.desc,h.acc||'']);
@@ -390,15 +443,106 @@ $('#impFile').addEventListener('change',async e=>{const f=e.target.files&&e.targ
     saveLocal();renderSide();renderMain();toast(`Copia importada: ${n} oficina${n!==1?'s':''} actualizada${n!==1?'s':''}, ${p} foto${p!==1?'s':''}.`)}
   catch(err){toast('Ese archivo no es una copia de la Gira TIC.')}});
 
+/* ---------- sincronización con GitHub (repositorio privado de datos) ---------- */
+const GH={owner:'joseeko2006',repo:'gira-tic-datos',branch:'main'};
+const TK_KEY='inseso-gira-tic-token';
+let token='';try{token=localStorage.getItem(TK_KEY)||''}catch(e){}
+let syncing=false,syncErr='',autoTimer=null;
+function hora(t){return new Date(t).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+function pendientesSync(){return Object.entries(S.docs).filter(([id,d])=>(S.synced[id]||0)<(d.updatedAt||0)||!S.sha[id]).length+Object.keys(S.borrados).length}
+async function gh(path,opts){opts=opts||{};
+  const r=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}${path}`,{method:opts.method||'GET',body:opts.body,cache:'no-store',
+    headers:Object.assign({'Accept':'application/vnd.github+json','Authorization':'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'},opts.body?{'Content-Type':'application/json'}:{})});
+  if(!r.ok){const e=new Error('GitHub '+r.status);e.status=r.status;throw e}
+  return r.status===204?null:r.json()}
+const b64enc=s=>{const u=new TextEncoder().encode(s);let b='';for(let i=0;i<u.length;i+=0x8000)b+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(b)};
+const b64bytes=b=>{const s=atob(String(b).replace(/\s/g,''));const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a};
+const b64dec=b=>new TextDecoder().decode(b64bytes(b));
+async function blobB64(blob){const u=await toDataURL(blob);return u.slice(u.indexOf(',')+1)}
+async function arbol(){try{const t=await gh(`/git/trees/${GH.branch}?recursive=1`);const m={};for(const x of t.tree||[])if(x.type==='blob')m[x.path]=x.sha;return m}
+  catch(e){if(e.status===409)return {};throw e}}
+const ponArchivo=(p,b64,sha,msg)=>gh('/contents/'+p.split('/').map(encodeURIComponent).join('/'),{method:'PUT',body:JSON.stringify(Object.assign({message:msg,content:b64,branch:GH.branch},sha?{sha}:{}))});
+const quitaArchivo=(p,sha,msg)=>gh('/contents/'+p.split('/').map(encodeURIComponent).join('/'),{method:'DELETE',body:JSON.stringify({message:msg,sha,branch:GH.branch})});
+function mensajeError(e){
+  if(e.status===401)return 'La clave de acceso no es válida o ha caducado. Vuelva a configurarla.';
+  if(e.status===403)return 'GitHub ha denegado el acceso. Revise que la clave tenga permiso de escritura en «gira-tic-datos».';
+  if(e.status===404)return 'No se encuentra el repositorio «gira-tic-datos» o la clave no tiene acceso a él.';
+  if(e.status===409||e.status===422)return 'Otro dispositivo cambió los datos a la vez. Pulse Sincronizar de nuevo.';
+  return 'No se pudo sincronizar (conexión débil). Se reintentará solo.'}
+function autoSync(ms){if(!token)return;clearTimeout(autoTimer);autoTimer=setTimeout(()=>sync(false),ms)}
+async function sync(manual){
+  if(!token){if(manual){$('#syncCfg').open=true;toast('Configure primero la clave de acceso.')}return}
+  if(syncing)return;
+  if(!navigator.onLine){if(manual)toast('Sin conexión. Se sincronizará sola al volver Internet.');setStatus();return}
+  syncing=true;syncErr='';setStatus();$('#syncGo').disabled=true;
+  let sub=0,baj=0,fs=0,fb=0;
+  try{
+    const T=await arbol();
+    // 1. oficinas eliminadas en este dispositivo
+    for(const id of Object.keys(S.borrados)){
+      for(const [p,sha] of Object.entries(T))if(p===`oficinas/${id}.json`||p.startsWith(`fotos/${id}/`)){await quitaArchivo(p,sha,`Eliminar ${id}`);delete T[p]}
+      delete S.borrados[id];saveLocal()}
+    // 2. traer lo que otros dispositivos han cambiado
+    const remotas={};
+    for(const [p,sha] of Object.entries(T)){const m=/^oficinas\/([^/]+)\.json$/.exec(p);if(!m)continue;const id=m[1];remotas[id]=sha;
+      if(S.sha[id]===sha)continue;
+      const r=JSON.parse(b64dec((await gh(`/git/blobs/${sha}`)).content));const l=S.docs[id];
+      if(!l||(r.updatedAt||0)>(l.updatedAt||0)){
+        const extra=l?(l.fotosApp||[]).filter(x=>!(r.fotosApp||[]).some(y=>y.id===x.id)):[];
+        S.docs[id]=r;S.synced[id]=r.updatedAt||0;
+        if(extra.length){r.fotosApp=(r.fotosApp||[]).concat(extra);r.updatedAt=Date.now()}
+        baj++}
+      S.sha[id]=sha}
+    for(const id of Object.keys(S.sha))if(!remotas[id]){const l=S.docs[id];
+      if(l&&(S.synced[id]||0)>=(l.updatedAt||0)){delete S.docs[id];try{for(const f of await fotosDe(id))await delFoto(f.id)}catch(e){}}
+      delete S.sha[id];delete S.synced[id]}
+    saveLocal();
+    // 3. subir fotos nuevas de este dispositivo
+    const locales=await allFotos().catch(()=>[]);
+    for(const f of locales){const d=S.docs[f.docId];if(!d)continue;
+      if(!(d.fotosApp||[]).some(m=>m.id===f.id)){(d.fotosApp=d.fotosApp||[]).push({id:f.id,area:f.area,pie:f.pie,t:f.t});d.updatedAt=Date.now()}
+      const p=`fotos/${f.docId}/${f.id}.jpg`;if(T[p])continue;
+      const r=await ponArchivo(p,await blobB64(f.blob),null,`Foto · ${d.nombre}`);T[p]=r.content.sha;fs++}
+    // 4. subir las fichas cambiadas en este dispositivo
+    for(const [id,d] of Object.entries(S.docs)){
+      if(S.sha[id]&&(S.synced[id]||0)>=(d.updatedAt||0))continue;
+      const stamp=d.updatedAt||0;
+      const r=await ponArchivo(`oficinas/${id}.json`,b64enc(JSON.stringify(d,null,1)),S.sha[id]||T[`oficinas/${id}.json`]||null,`${d.nombre}: actualización de la ficha`);
+      S.sha[id]=r.content.sha;S.synced[id]=stamp;sub++;saveLocal()}
+    // 5. bajar fotos que faltan en este dispositivo
+    const tengo=new Set(locales.map(f=>f.id));
+    if(idb)for(const [id,d] of Object.entries(S.docs))for(const m of d.fotosApp||[]){
+      if(tengo.has(m.id))continue;const p=`fotos/${id}/${m.id}.jpg`;if(!T[p])continue;
+      const b=await gh(`/git/blobs/${T[p]}`);await putFoto({id:m.id,docId:id,area:m.area,pie:m.pie,t:m.t,blob:new Blob([b64bytes(b.content)],{type:'image/jpeg'})});fb++}
+    // 6. quitar del repositorio las fotos borradas
+    const ref=new Set();for(const [id,d] of Object.entries(S.docs))for(const m of d.fotosApp||[])ref.add(`fotos/${id}/${m.id}.jpg`);
+    for(const [p,sha] of Object.entries(T))if(p.startsWith('fotos/')&&!ref.has(p)&&S.docs[p.split('/')[1]])await quitaArchivo(p,sha,'Quitar foto');
+    S.lastSync=Date.now();saveLocal();
+    if(!S.current||!S.docs[S.current])S.current=sorted()[0]?.[0]||null;
+    if(!isEditing()){renderSide();renderMain()}else renderSide();
+    if(manual||baj||fb)toast(sub+baj+fs+fb?`Sincronizado: ${sub} ficha${sub!==1?'s':''} enviada${sub!==1?'s':''}, ${baj} recibida${baj!==1?'s':''}, ${fs+fb} foto${fs+fb!==1?'s':''}.`:'Todo estaba al día.');
+  }catch(e){syncErr=mensajeError(e);if(manual)toast(syncErr);if(e.status!==401&&e.status!==403&&e.status!==404)autoSync(120000)}
+  finally{syncing=false;$('#syncGo').disabled=false;saveLocal()}
+}
+$('#syncGo').addEventListener('click',()=>sync(true));
+$('#syncSave').addEventListener('click',async()=>{const v=$('#syncToken').value.trim();if(!v){$('#syncToken').focus();return}
+  token=v;try{localStorage.setItem(TK_KEY,v)}catch(e){}$('#syncToken').value='';
+  try{await gh('');syncErr='';$('#syncCfg').open=false;toast('Clave guardada. Sincronizando…');sync(true)}
+  catch(e){syncErr=mensajeError(e);toast(syncErr);setStatus()}});
+$('#syncForget').addEventListener('click',e=>arm(e.currentTarget,'Pulse otra vez para olvidarla',()=>{token='';syncErr='';try{localStorage.removeItem(TK_KEY)}catch(err){}setStatus();toast('Clave borrada de este dispositivo.')}));
+window.addEventListener('online',()=>autoSync(3000));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')autoSync(3000)});
+
 /* ---------- arranque ---------- */
 loadLocal();
-if(!Object.keys(S.docs).length){S.docs['bata']=newDoc('Bata','Bata',{contingencia:true,info:{fecha:'2026-10-19'}});S.current='bata';saveLocal()}
+if(!Object.keys(S.docs).length){S.docs['bata']=newDoc('Bata','Bata',{contingencia:true,info:{fecha:'2026-10-19'},creado:0,updatedAt:0});S.current='bata';saveLocal()}
 if(!S.current||!S.docs[S.current])S.current=sorted()[0]?.[0]||null;
-renderSide();renderMain();setStatus();
+renderSide();renderMain();setStatus();autoSync(2500);
 openIDB().then(db=>{idb=db;renderPhotos()}).catch(()=>{});
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
 const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 if(!standalone)$('#installBanner').hidden=false;
+if('serviceWorker' in navigator&&navigator.serviceWorker.controller){let recargada=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!recargada&&!isEditing()){recargada=true;location.reload()}})}
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').then(()=>navigator.serviceWorker.ready).then(()=>{$('#offlineNote').textContent='Lista para usar sin conexión. Todo se guarda en este iPad al momento.'}).catch(()=>{})}
 </script>
 </body>
