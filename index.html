@@ -276,7 +276,7 @@ h2.sec{font-size:18px;margin:22px 0 8px}
 <div class="toast" id="toast" hidden></div>
 
 <script>
-const APP_VERSION='3.0.0';
+const APP_VERSION='3.0.1';
 /* ---------- catálogo de la revisión ---------- */
 const AMBITOS=[
  {k:'tic',t:'Técnico (TIC)',resp:'Jefe del Servicio de Informática y Transformación Digital',areas:[
@@ -728,7 +728,7 @@ $('#wipe').addEventListener('click',e=>{const n=pendientesSync();
     location.reload()})});
 
 /* ---------- sincronización con GitHub (repositorio privado de datos, un único envío por sincronización) ---------- */
-const GH={owner:'joseeko2006',repo:'gira-tic-datos',branch:'main'};
+const GH={owner:'inseso',repo:'gira-tic-datos',branch:'main'};
 const TK_KEY='inseso-gira-tic-token';
 let token='';try{token=localStorage.getItem(TK_KEY)||''}catch(e){}
 let syncing=false,syncErr='',autoTimer=null;
